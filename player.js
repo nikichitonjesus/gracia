@@ -1,6 +1,5 @@
-// player.js - Reproductor profesional estilo Prime Video
+// player.js - Reproductor profesional con Media Session y PiP personalizado
 (function() {
-    // Elementos del DOM (se crearán dinámicamente, pero se inyectan al final)
     let player, video, controls, centerControls, playPauseBtn, seekBackBtn, seekForwardBtn,
         timeDisplay, progressBar, progress, progressHandle, progressTimeTooltip,
         volumeBtn, volumeSlider, volumePopup, volumeIndicator,
@@ -11,39 +10,33 @@
         episodeList, listContent, closeListBtn,
         recommendationsContainer, closeRecoBtn,
         timeIndicator, backdrop, errorMessage, loadingIndicator, loadingPercentage, loadingThumbnail,
-        settingsBtn, settingsPopup, historyPlaylistBtn,
-        initialSkipIndicator;
+        settingsBtn, settingsPopup, historyPlaylistBtn;
 
     let isPlaying = false;
     let controlsTimeout = null;
     let isDragging = false;
-    let currentSpeed = 1;
-    let currentVolume = 1;
-    let episodeData = null;        // { tipo: 'serie', seriesId, episodios: [], indiceActual, etc }
-    let currentMode = null;        // 'serie' o 'single'
+    let episodeData = null;
+    let currentMode = null;
     let currentSeriesId = null;
     let currentEpisodeId = null;
-    let currentVideoUrl = null;
-    let skipTimers = { intro: null, recap: null };
     let seekAccumulator = 0;
     let seekTimeout = null;
     let isMobile = false;
     let videoDuration = 0;
 
-    // Inicialización
     function init() {
         crearEstructuraHTML();
         bindEvents();
         actualizarResponsive();
         window.addEventListener('resize', actualizarResponsive);
-        // Exponer funciones globales
         window.playSerie = playSerie;
         window.playSingle = playSingle;
         window.cerrarPlayer = cerrarPlayer;
+        // Configurar Media Session
+        configurarMediaSession();
     }
 
     function crearEstructuraHTML() {
-        // Crear contenedor principal si no existe
         if (document.getElementById('universal-video-player')) return;
         const div = document.createElement('div');
         div.id = 'universal-video-player';
@@ -151,7 +144,6 @@
         settingsBtn = player.querySelector('#settings-btn');
         settingsPopup = player.querySelector('#settings-popup');
         historyPlaylistBtn = player.querySelector('#history-playlist-btn');
-        initialSkipIndicator = player.querySelector('.skip-buttons-container'); // reutilizamos contenedor
     }
 
     function bindEvents() {
@@ -163,6 +155,8 @@
         video.addEventListener('playing', hideLoading);
         video.addEventListener('progress', updateLoading);
         video.addEventListener('pause', () => guardarProgresoActual());
+        video.addEventListener('play', () => actualizarMediaSessionPlayback(true));
+        video.addEventListener('pause', () => actualizarMediaSessionPlayback(false));
         playPauseBtn.addEventListener('click', togglePlay);
         seekBackBtn.addEventListener('click', () => seek(-10));
         seekForwardBtn.addEventListener('click', () => seek(10));
@@ -177,7 +171,7 @@
         settingsBtn.addEventListener('click', () => togglePopup(settingsPopup));
         volumeSlider.addEventListener('input', (e) => { video.volume = e.target.value; volumeIndicator.innerText = Math.round(e.target.value*100)+'%'; });
         speedSlider.addEventListener('input', (e) => { video.playbackRate = e.target.value; speedIndicator.innerText = e.target.value+'x'; });
-        historyPlaylistBtn.addEventListener('click', () => { alert("Historial: abre panel lateral con historial (pendiente de implementación)"); });
+        historyPlaylistBtn.addEventListener('click', () => alert("Historial (puedes implementar un panel lateral aquí)"));
         player.querySelector('#pip-settings-btn').addEventListener('click', togglePictureInPicture);
         progressBar.addEventListener('mousedown', startSeek);
         progressBar.addEventListener('mousemove', showTooltip);
@@ -194,9 +188,7 @@
         nextEpisodeInfoBtn.addEventListener('click', () => { siguienteEpisodio(); ocultarInfo(); });
         backdrop.addEventListener('click', () => { if(videoInfo.style.display === 'flex') ocultarInfo(); else togglePlay(); });
         closeRecoBtn.addEventListener('click', cerrarRecomendaciones);
-        // Scroll para recomendaciones flotantes
         player.addEventListener('wheel', manejarScrollRecomendaciones);
-        // Teclado
         document.addEventListener('keydown', (e) => {
             if(player.style.display !== 'block') return;
             if(e.key === ' ' || e.key === 'Space') { e.preventDefault(); togglePlay(); }
@@ -206,14 +198,77 @@
             if(e.key === 'f') toggleFullscreen();
             if(e.key === 'p') togglePictureInPicture();
         });
-        // Mostrar controles al mover mouse
         player.addEventListener('mousemove', mostrarControles);
         player.addEventListener('mouseleave', () => { if(isPlaying) ocultarControles(); });
-        // Touch para móvil
         video.addEventListener('touchstart', manejarToque);
+        // PiP personalizado
+        video.addEventListener('enterpictureinpicture', onEnterPip);
+        video.addEventListener('leavepictureinpicture', onLeavePip);
     }
 
-    // Funciones auxiliares
+    // Media Session API
+    function configurarMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+        navigator.mediaSession.setActionHandler('play', () => togglePlay());
+        navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => seek(-10));
+        navigator.mediaSession.setActionHandler('seekforward', (details) => seek(10));
+        navigator.mediaSession.setActionHandler('previoustrack', () => anteriorEpisodio());
+        navigator.mediaSession.setActionHandler('nexttrack', () => siguienteEpisodio());
+        navigator.mediaSession.setActionHandler('seekto', (details) => { if (details.seekTime) video.currentTime = details.seekTime; });
+    }
+
+    function actualizarMediaSessionMetadata(titulo, artista, miniatura) {
+        if (!('mediaSession' in navigator)) return;
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: titulo,
+            artist: artista || 'Niki Chiton Jesus',
+            artwork: [{ src: miniatura, sizes: '512x512', type: 'image/png' }]
+        });
+    }
+
+    function actualizarMediaSessionPlayback(playing) {
+        if (!('mediaSession' in navigator)) return;
+        navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    }
+
+    function actualizarMediaSessionPosition() {
+        if (!('mediaSession' in navigator) || !video.duration) return;
+        if ('setPositionState' in navigator.mediaSession) {
+            navigator.mediaSession.setPositionState({
+                duration: video.duration,
+                position: video.currentTime,
+                playbackRate: video.playbackRate
+            });
+        }
+    }
+
+    // PiP mejorado
+    function togglePictureInPicture() {
+        if (document.pictureInPictureElement) {
+            document.exitPictureInPicture();
+        } else if (video.readyState >= 2) {
+            video.requestPictureInPicture().catch(err => showError('PiP no disponible: ' + err.message));
+        } else {
+            showError('El video aún no está listo para PiP');
+        }
+    }
+
+    function onEnterPip() {
+        // Personalizar ventana PiP (solo podemos cambiar el título y mostrar algún overlay? No es posible modificar el estilo nativo)
+        // Pero podemos mostrar un mensaje o ajustar algo
+        console.log('PiP activado');
+        // Opcional: mostrar un pequeño tooltip
+        const pipBtn = player.querySelector('#pip-settings-btn');
+        if (pipBtn) pipBtn.style.opacity = '0.7';
+    }
+
+    function onLeavePip() {
+        const pipBtn = player.querySelector('#pip-settings-btn');
+        if (pipBtn) pipBtn.style.opacity = '1';
+    }
+
+    // Resto de funciones (igual que antes, pero con pequeñas mejoras)
     function togglePopup(popup) {
         document.querySelectorAll('.slider-popup, .settings-popup').forEach(p => p.classList.remove('show'));
         popup.classList.toggle('show');
@@ -228,6 +283,7 @@
         clearTimeout(controlsTimeout);
         if(isPlaying) controlsTimeout = setTimeout(ocultarControles, 2500);
     }
+
     function ocultarControles() {
         if(!player.classList.contains('controls-visible')) return;
         player.classList.remove('controls-visible');
@@ -257,7 +313,6 @@
         if(nuevaPos < 0) nuevaPos = 0;
         if(nuevaPos > video.duration) nuevaPos = video.duration;
         video.currentTime = nuevaPos;
-        // Acumulación para indicador
         seekAccumulator += segundos;
         if(seekTimeout) clearTimeout(seekTimeout);
         mostrarIndicadorSeek(seekAccumulator);
@@ -283,22 +338,18 @@
         const total = formatTime(video.duration);
         timeDisplay.innerText = `${current} / ${total}`;
         videoDuration = video.duration;
-        // Mostrar skip si aplica
+        actualizarMediaSessionPosition();
+        // Mostrar skip buttons
         if(episodeData && episodeData.tipo === 'serie' && episodeData.episodios[episodeData.indiceActual]) {
             const ep = episodeData.episodios[episodeData.indiceActual];
-            if(ep.skipIntro && video.currentTime >= parseTime(ep.skipIntro.start) && video.currentTime <= parseTime(ep.skipIntro.end)) {
-                skipIntroBtn.style.display = 'block';
-            } else skipIntroBtn.style.display = 'none';
-            if(ep.skipRecap && video.currentTime >= parseTime(ep.skipRecap.start) && video.currentTime <= parseTime(ep.skipRecap.end)) {
-                skipRecapBtn.style.display = 'block';
-            } else skipRecapBtn.style.display = 'none';
+            if(ep.skipIntro && video.currentTime >= parseTime(ep.skipIntro.start) && video.currentTime <= parseTime(ep.skipIntro.end)) skipIntroBtn.style.display = 'block';
+            else skipIntroBtn.style.display = 'none';
+            if(ep.skipRecap && video.currentTime >= parseTime(ep.skipRecap.start) && video.currentTime <= parseTime(ep.skipRecap.end)) skipRecapBtn.style.display = 'block';
+            else skipRecapBtn.style.display = 'none';
             if(ep.skipCredits && video.currentTime >= parseTime(ep.skipCredits.start) && video.currentTime <= parseTime(ep.skipCredits.end)) {
                 creditsContainer.style.display = 'flex';
                 iniciarCuentaRegresivaCredits();
-            } else {
-                creditsContainer.style.display = 'none';
-                if(window.creditsTimeout) clearTimeout(window.creditsTimeout);
-            }
+            } else creditsContainer.style.display = 'none';
         }
     }
 
@@ -312,20 +363,17 @@
         }
     }
 
+    let creditsTimeout = null;
     function iniciarCuentaRegresivaCredits() {
-        if(window.creditsTimeout) clearTimeout(window.creditsTimeout);
-        window.creditsTimeout = setTimeout(() => {
-            siguienteEpisodio();
-            creditsContainer.style.display = 'none';
-        }, 10000);
-        // animación circular
+        if(creditsTimeout) clearTimeout(creditsTimeout);
+        creditsTimeout = setTimeout(() => { siguienteEpisodio(); creditsContainer.style.display = 'none'; }, 10000);
         const circle = nextEpisodePreview.querySelector('.progress-circle');
         circle.style.animation = 'none';
         circle.offsetHeight;
         circle.style.animation = 'progressCircle 10s linear forwards';
     }
     function cancelSkipCredits() {
-        if(window.creditsTimeout) clearTimeout(window.creditsTimeout);
+        if(creditsTimeout) clearTimeout(creditsTimeout);
         creditsContainer.style.display = 'none';
     }
 
@@ -335,24 +383,19 @@
         if(nuevoIdx < 0) nuevoIdx = 0;
         cargarEpisodio(nuevoIdx);
     }
+
     function siguienteEpisodio() {
         if(!episodeData || episodeData.tipo !== 'serie') {
-            // Modo single: buscar aleatorio
             buscarAleatorio();
             return;
         }
         let nuevoIdx = episodeData.indiceActual + 1;
-        if(nuevoIdx >= episodeData.episodios.length) {
-            // serie terminada, buscar aleatorio
-            buscarAleatorio();
-        } else {
-            cargarEpisodio(nuevoIdx);
-        }
+        if(nuevoIdx >= episodeData.episodios.length) buscarAleatorio();
+        else cargarEpisodio(nuevoIdx);
     }
 
-    async function buscarAleatorio() {
-        // Por simplicidad, muestra mensaje o carga una serie de ejemplo
-        alert("No hay más episodios. Implementar búsqueda aleatoria según tu catálogo.");
+    function buscarAleatorio() {
+        alert("No hay más episodios. Pronto se agregará contenido aleatorio.");
         cerrarPlayer();
     }
 
@@ -372,6 +415,9 @@
         ocultarInfo();
         guardarProgresoActual();
         mostrarControles();
+        // Actualizar Media Session
+        actualizarMediaSessionMetadata(ep.title, episodeData.seriesId, ep.thumbnail);
+        actualizarMediaSessionPlayback(true);
     }
 
     function actualizarListaLateral() {
@@ -381,10 +427,7 @@
             const item = document.createElement('div');
             item.className = `episode-item ${idx === episodeData.indiceActual ? 'active' : ''}`;
             item.innerHTML = `<div class="episode-thumbnail" style="background-image:url('${ep.thumbnail}')"></div><div><strong>${ep.title}</strong><br>${ep.date || ''}</div>`;
-            item.addEventListener('click', () => {
-                cargarEpisodio(idx);
-                toggleEpisodeList();
-            });
+            item.addEventListener('click', () => { cargarEpisodio(idx); toggleEpisodeList(); });
             listContent.appendChild(item);
         });
     }
@@ -405,11 +448,9 @@
         if(episodeData && episodeData.tipo === 'serie') {
             const ep = episodeData.episodios[episodeData.indiceActual];
             Memoria.guardarProgresoEpisodio(episodeData.seriesId, ep.id, video.currentTime, video.duration);
-            if(video.currentTime >= video.duration * 0.95) {
-                Memoria.marcarEpisodioCompletado(episodeData.seriesId, ep.id);
-            }
+            if(video.currentTime >= video.duration * 0.95) Memoria.marcarEpisodioCompletado(episodeData.seriesId, ep.id);
         } else if(currentMode === 'single') {
-            Memoria.guardarProgresoIndividual(currentEpisodeId, video.currentTime, video.duration, document.getElementById('video-title').innerText, '');
+            Memoria.guardarProgresoIndividual(currentEpisodeId, video.currentTime, video.duration, document.getElementById('video-title').innerText, video.poster);
         }
     }
 
@@ -417,23 +458,16 @@
         guardarProgresoActual();
         if(episodeData && episodeData.tipo === 'serie') {
             const proximo = episodeData.indiceActual + 1;
-            if(proximo < episodeData.episodios.length) {
-                cargarEpisodio(proximo);
-            } else {
-                mostrarInfoFinSerie();
-            }
+            if(proximo < episodeData.episodios.length) cargarEpisodio(proximo);
+            else mostrarInfo('Serie completada', '¡Felicidades! Has visto toda la serie.');
         } else {
-            mostrarInfoFinIndividual();
+            mostrarInfo('Reproducción finalizada', 'Puedes elegir otro contenido.');
         }
     }
 
-    function mostrarInfoFinSerie() { mostrarInfo('¡Serie completada!', 'Has visto todos los episodios. ¿Buscas más contenido?'); }
-    function mostrarInfoFinIndividual() { mostrarInfo('Finalizado', 'Reproducción terminada. Puedes ver otro contenido.'); }
-    function mostrarInfo(titulo, desc) { infoTitle.innerText = titulo; infoDescription.innerText = desc; videoInfo.style.display = 'flex'; }
-
+    function mostrarInfo(titulo, desc) { infoTitle.innerText = titulo; infoDescription.innerText = desc; videoInfo.style.display = 'flex'; ocultarControles(); }
     function ocultarInfo() { videoInfo.style.display = 'none'; }
     function mostrarInfoTrasPausa() { setTimeout(() => { if(!isPlaying && videoInfo.style.display !== 'flex') videoInfo.style.display = 'flex'; }, 6000); }
-
     function reiniciarEpisodio() { video.currentTime = 0; video.play(); ocultarInfo(); }
     function reanudarEpisodio() { video.play(); ocultarInfo(); }
 
@@ -441,38 +475,8 @@
         if(document.fullscreenElement) document.exitFullscreen();
         else player.requestFullscreen();
     }
-    function togglePictureInPicture() {
-        if(document.pictureInPictureElement) document.exitPictureInPicture();
-        else video.requestPictureInPicture();
-    }
 
-    // Scroll para recomendaciones flotantes (aparecen al scroll up, desaparecen scroll down)
-    let lastScrollY = 0;
-    function manejarScrollRecomendaciones(e) {
-        const delta = e.deltaY;
-        if(delta < 0) { // scroll up
-            recommendationsContainer.classList.add('show');
-            cargarRecomendaciones();
-        } else if(delta > 0) {
-            recommendationsContainer.classList.remove('show');
-        }
-        lastScrollY = delta;
-    }
-    function cargarRecomendaciones() {
-        const recoGrid = player.querySelector('#recommendations-grid');
-        const recos = Memoria.obtenerRecomendados();
-        recoGrid.innerHTML = '';
-        recos.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'reco-card';
-            card.innerHTML = `<img src="${item.miniatura}" alt=""><span>${item.titulo}</span>`;
-            card.onclick = () => { alert(`Reproducir ${item.titulo} (implementar)`); };
-            recoGrid.appendChild(card);
-        });
-    }
-    function cerrarRecomendaciones() { recommendationsContainer.classList.remove('show'); }
-
-    // Funciones de barra de progreso
+    // Barra de progreso
     let dragging = false;
     function startSeek(e) { dragging = true; seekFromEvent(e); }
     function startDragHandle(e) { dragging = true; e.stopPropagation(); }
@@ -525,50 +529,60 @@
         player.style.display = 'none';
         video.src = '';
         isPlaying = false;
+        if(creditsTimeout) clearTimeout(creditsTimeout);
+        actualizarMediaSessionPlayback(false);
     }
     function actualizarResponsive() { isMobile = window.innerWidth <= 768; }
 
-    // --- API pública ---
+    function manejarScrollRecomendaciones(e) {
+        if(e.deltaY < 0) { recommendationsContainer.classList.add('show'); cargarRecomendaciones(); }
+        else if(e.deltaY > 0) recommendationsContainer.classList.remove('show');
+    }
+    function cargarRecomendaciones() {
+        const recoGrid = player.querySelector('#recommendations-grid');
+        const recos = Memoria.obtenerRecomendados();
+        recoGrid.innerHTML = '';
+        recos.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'reco-card';
+            card.innerHTML = `<img src="${item.miniatura}" alt=""><span>${item.titulo}</span>`;
+            card.onclick = () => alert(`Reproducir ${item.titulo} (implementar)`);
+            recoGrid.appendChild(card);
+        });
+    }
+    function cerrarRecomendaciones() { recommendationsContainer.classList.remove('show'); }
+    function manejarToque(e) { /* para móvil doble toque, dejamos igual */ }
+
+    // API pública
     function playSerie(seriesId, episodiosArray) {
         if(!episodiosArray.length) return;
-        // Ordenar por fecha (más antiguo primero)
         episodiosArray.sort((a,b) => new Date(a.date) - new Date(b.date));
-        episodeData = {
-            tipo: 'serie',
-            seriesId,
-            episodios: episodiosArray,
-            indiceActual: 0
-        };
+        episodeData = { tipo: 'serie', seriesId, episodios: episodiosArray, indiceActual: 0 };
         currentMode = 'serie';
         currentSeriesId = seriesId;
-        // Buscar siguiente episodio no completado
         const idsOrdenados = episodiosArray.map(ep => ep.id);
         const siguienteId = Memoria.obtenerSiguienteEpisodio(seriesId, idsOrdenados);
         if(siguienteId) {
             const idx = episodiosArray.findIndex(ep => ep.id === siguienteId);
             if(idx !== -1) episodeData.indiceActual = idx;
-        } else {
-            // serie completada, empezar desde primero pero mostrar info
-            episodeData.indiceActual = 0;
-            mostrarInfo('Serie completada', '¿Quieres volver a verla desde el inicio?');
         }
         const ep = episodiosArray[episodeData.indiceActual];
         currentEpisodeId = ep.id;
         video.src = ep.mediaUrl;
         video.poster = ep.thumbnail;
         document.getElementById('video-title').innerText = ep.title;
-        const progreso = Memoria.obtenerProgresoEpisodio(seriesId, ep.id);
-        video.currentTime = progreso;
+        video.currentTime = Memoria.obtenerProgresoEpisodio(seriesId, ep.id);
         player.style.display = 'block';
-        video.play().catch(e => { errorMessage.innerText = 'Error al reproducir'; errorMessage.style.display='block'; setTimeout(()=>errorMessage.style.display='none',3000); });
+        video.play().catch(e => { errorMessage.innerText = 'Error al cargar'; errorMessage.style.display='block'; setTimeout(()=>errorMessage.style.display='none',3000); });
         isPlaying = true;
         playPauseBtn.querySelector('img').src = 'https://nikichitonjesus.odoo.com/web/image/716-c7a68f34/pausevid.png';
         actualizarListaLateral();
-        if(video.currentTime > 0 && !(video.currentTime >= video.duration*0.95)) ocultarInfo(); else if(video.currentTime===0) ocultarInfo();
+        ocultarInfo();
         mostrarControles();
-        // Cerrar panel lateral si estaba abierto
-        episodeList.classList.remove('show');
         video.style.width = '100%';
+        episodeList.classList.remove('show');
+        actualizarMediaSessionMetadata(ep.title, seriesId, ep.thumbnail);
+        actualizarMediaSessionPlayback(true);
     }
 
     function playSingle(episodio) {
@@ -578,16 +592,16 @@
         video.src = episodio.mediaUrl;
         video.poster = episodio.thumbnail;
         document.getElementById('video-title').innerText = episodio.title;
-        const progreso = Memoria.obtenerProgresoIndividual(episodio.id);
-        video.currentTime = progreso;
+        video.currentTime = Memoria.obtenerProgresoIndividual(episodio.id);
         player.style.display = 'block';
         video.play();
         isPlaying = true;
         playPauseBtn.querySelector('img').src = 'https://nikichitonjesus.odoo.com/web/image/716-c7a68f34/pausevid.png';
         ocultarInfo();
         mostrarControles();
-        // Limpiar panel lateral
         listContent.innerHTML = '<p>Sin episodios adicionales</p>';
+        actualizarMediaSessionMetadata(episodio.title, 'Película', episodio.thumbnail);
+        actualizarMediaSessionPlayback(true);
     }
 
     window.playSerie = playSerie;
