@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Universal Player · Demo</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0b0d12;color:#fff;
+    font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif}
+  header{padding:48px 32px 16px;max-width:1280px;margin:0 auto}
+  header h1{margin:0 0 6px;font-size:32px;letter-spacing:-.01em}
+  header p{margin:0;color:#9aa3b2}
+  main{max-width:1280px;margin:0 auto;padding:24px 32px 80px}
+  h2{font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:#9ad1ff;margin:32px 0 14px}
+  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .card{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;
+    background:#171a22;transition:transform .25s ease, box-shadow .25s ease;aspect-ratio:16/9}
+  .card:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.5)}
+  .card img{width:100%;height:100%;object-fit:cover;display:block}
+  .card .ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
+    padding:14px;background:linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,0) 55%)}
+  .card .badge{align-self:flex-start;font-size:10px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;background:rgba(0,194,255,.18);color:#9ad1ff;padding:4px 8px;border-radius:4px;margin-bottom:8px}
+  .card .ttl{font-size:15px;font-weight:700;line-height:1.2}
+  .card .sub{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .toolbar button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12);
+    padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;transition:background .15s}
+  .toolbar button:hover{background:rgba(255,255,255,.16)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Universal Player · Demo</h1>
+  <p>Reproductor estilo Prime Video. Click en una serie o película para abrirlo.</p>
+  <div class="toolbar">
+    <button onclick="UniversalPlayer.play({type:'series', seriesid:'navidad'})">▶ Reproducir serie completa</button>
+    <button onclick="playRandom()">🎲 Episodio aleatorio</button>
+  </div>
+</header>
+
+<main>
+  <h2>Series</h2>
+  <div class="grid" id="series"></div>
+
+  <h2>Películas / episodios individuales</h2>
+  <div class="grid" id="singles"></div>
+</main>
+
+<script src="episodios.js"></script>
+<script src="player.js"></script>
+<script>
+  // Render series
+  const $series = document.getElementById('series');
+  window.SERIES.forEach(s => {
+    const eps = window.masEpisodios.bySeries(s.seriesid);
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.style.background = s.bgColor || '#222';
+    c.innerHTML = `
+      <img src="${s.portada_serie}" alt="${s.titulo_serie}" loading="lazy">
+      <div class="ov">
+        <span class="badge">Serie · ${eps.length} ep.</span>
+        <div class="ttl">${s.titulo_serie}</div>
+        <div class="sub">${s.descripcion_serie}</div>
+      </div>`;
+    c.onclick = () => UniversalPlayer.play({ type:'series', seriesid: s.seriesid });
+    $series.appendChild(c);
+  });
+
+  // Render episodios sin serie real (películas / individuales)
+  const seriesIds = new Set(window.SERIES.map(s => s.seriesid));
+  const singles = window.EPISODES.filter(e => !seriesIds.has(e.seriesid));
+  const $singles = document.getElementById('singles');
+  singles.forEach(e => {
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.innerHTML = `
+      <img src="${e.thumbnail || e.thumbnail2}" alt="${e.title}" loading="lazy">
+      <div class="ov">
+        <span class="badge">${e.type || 'Video'} · ${e.year || ''}</span>
+        <div class="ttl">${e.title}</div>
+        <div class="sub">${e.description || ''}</div>
+      </div>`;
+    c.onclick = () => UniversalPlayer.play({ type:'episode', id: e.id });
+    $singles.appendChild(c);
+  });
+
+  function playRandom(){
+    const ep = window.masEpisodios.random(1)[0];
+    if (ep) UniversalPlayer.play({ type:'episode', episode: ep });
+  }
+</script>
+</body>
+</html>
