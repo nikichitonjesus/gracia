@@ -1,97 +1,198 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Universal Player · Demo</title>
-<style>
-  *{box-sizing:border-box}
-  body{margin:0;background:#0b0d12;color:#fff;
-    font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif}
-  header{padding:48px 32px 16px;max-width:1280px;margin:0 auto}
-  header h1{margin:0 0 6px;font-size:32px;letter-spacing:-.01em}
-  header p{margin:0;color:#9aa3b2}
-  main{max-width:1280px;margin:0 auto;padding:24px 32px 80px}
-  h2{font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:#9ad1ff;margin:32px 0 14px}
-  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
-  .card{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;
-    background:#171a22;transition:transform .25s ease, box-shadow .25s ease;aspect-ratio:16/9}
-  .card:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.5)}
-  .card img{width:100%;height:100%;object-fit:cover;display:block}
-  .card .ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
-    padding:14px;background:linear-gradient(to top,rgba(0,0,0,.85),rgba(0,0,0,0) 55%)}
-  .card .badge{align-self:flex-start;font-size:10px;font-weight:700;letter-spacing:.14em;
-    text-transform:uppercase;background:rgba(0,194,255,.18);color:#9ad1ff;padding:4px 8px;border-radius:4px;margin-bottom:8px}
-  .card .ttl{font-size:15px;font-weight:700;line-height:1.2}
-  .card .sub{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px}
-  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
-  .toolbar button{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12);
-    padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;transition:background .15s}
-  .toolbar button:hover{background:rgba(255,255,255,.16)}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Reproductor Universal - Prime Video Style</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0f0f1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            padding: 20px;
+        }
+        .catalogo {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2rem;
+            border-left: 4px solid #00a8ff;
+            padding-left: 15px;
+        }
+        .series-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+        .card {
+            background: #1e1e2a;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .card img {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+        }
+        .card-info {
+            padding: 12px;
+        }
+        .card-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+        .card-info p {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        .boton-play {
+            display: inline-block;
+            background: #00a8ff;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .boton-play:hover {
+            background: #0088cc;
+        }
+        hr {
+            margin: 40px 0 20px;
+            border-color: #333;
+        }
+    </style>
 </head>
 <body>
+    <div class="catalogo">
+        <h1>🎬 Contenido Destacado</h1>
+        <div class="series-grid" id="catalogo-grid"></div>
+        
+        <hr>
+        <h2>📺 Episodios sueltos</h2>
+        <div class="series-grid" id="singles-grid"></div>
+    </div>
 
-<header>
-  <h1>Universal Player · Demo</h1>
-  <p>Reproductor estilo Prime Video. Click en una serie o película para abrirlo.</p>
-  <div class="toolbar">
-    <button onclick="UniversalPlayer.play({type:'series', seriesid:'navidad'})">▶ Reproducir serie completa</button>
-    <button onclick="playRandom()">🎲 Episodio aleatorio</button>
-  </div>
-</header>
+    <!-- Cargar módulos -->
+    <script src="memoria.js"></script>
+    <script src="player.js"></script>
+    <script>
+        // Datos de ejemplo
+        const serieJesucristo = {
+            seriesId: "jesucristo",
+            titulo_serie: "La vida de Jesucristo",
+            descripcion_serie: "Serie épica sobre la vida y enseñanzas de Jesús.",
+            portada_serie: "https://nikichitonjesus1.odoo.com/web/image/465-4e045826/Min-jesus.webp",
+            episodios: [
+                {
+                    id: "ep1",
+                    date: "2025-11-20",
+                    mediaUrl: "https://archive.org/download/la-vida-de-jesus-en-ixil-trailer/la%20vida%20de%20Jes%C3%BAs.mp4",
+                    thumbnail: "https://nikichitonjesus1.odoo.com/web/image/465-4e045826/Min-jesus.webp",
+                    title: "El Nacimiento",
+                    description: "El anuncio a María y el nacimiento en Belén.",
+                    skipIntro: { start: "00:00", end: "00:08" },
+                    skipRecap: { start: "00:45", end: "01:15" },
+                    skipCredits: { start: "01:50", end: "02:00" }
+                },
+                {
+                    id: "ep2",
+                    date: "2025-11-21",
+                    mediaUrl: "https://archive.org/download/la-vida-de-jesus-en-espanol-trailer/la%20vida%20de%20Jes%C3%BAs.mp4",
+                    thumbnail: "https://video.nikichitonjesus.org/web/image/438-44d31586/6.webp",
+                    title: "El Ministerio",
+                    description: "Jesús comienza sus milagros y enseñanzas.",
+                    skipIntro: { start: "00:00", end: "00:10" },
+                    skipRecap: { start: "01:00", end: "01:30" },
+                    skipCredits: { start: "02:00", end: "02:10" }
+                },
+                {
+                    id: "ep3",
+                    date: "2025-11-22",
+                    mediaUrl: "https://archive.org/download/la-vida-de-jesus-en-espanol-trailer/la%20vida%20de%20Jes%C3%BAs.mp4",
+                    thumbnail: "https://nikichitonjesus1.odoo.com/web/image/465-4e045826/Min-jesus.webp",
+                    title: "La Pasión",
+                    description: "La crucifixión y resurrección.",
+                    skipIntro: { start: "00:00", end: "00:07" },
+                    skipCredits: { start: "02:15", end: "02:25" }
+                }
+            ]
+        };
 
-<main>
-  <h2>Series</h2>
-  <div class="grid" id="series"></div>
+        const peliculaSuelta = {
+            id: "amor-dios",
+            mediaUrl: "https://archive.org/download/la-vida-de-jesus-en-espanol-trailer/la%20vida%20de%20Jes%C3%BAs.mp4",
+            thumbnail: "https://nikichitonjesus1.odoo.com/web/image/465-4e045826/Min-jesus.webp",
+            title: "El Amor de Dios (Película)",
+            description: "Una historia conmovedora sobre la fe.",
+            date: "2025-11-15"
+        };
 
-  <h2>Películas / episodios individuales</h2>
-  <div class="grid" id="singles"></div>
-</main>
+        function cargarCatalogo() {
+            const grid = document.getElementById('catalogo-grid');
+            // Serie
+            const cardSerie = document.createElement('div');
+            cardSerie.className = 'card';
+            cardSerie.innerHTML = `
+                <img src="${serieJesucristo.portada_serie}" alt="Serie">
+                <div class="card-info">
+                    <h3>${serieJesucristo.titulo_serie}</h3>
+                    <p>${serieJesucristo.descripcion_serie}</p>
+                    <button class="boton-play" data-serie="jesucristo">▶ Ver serie</button>
+                </div>
+            `;
+            cardSerie.querySelector('button').addEventListener('click', () => {
+                window.playSerie(serieJesucristo.seriesId, serieJesucristo.episodios);
+            });
+            grid.appendChild(cardSerie);
 
-<script src="episodios.js"></script>
-<script src="player.js"></script>
-<script>
-  // Render series
-  const $series = document.getElementById('series');
-  window.SERIES.forEach(s => {
-    const eps = window.masEpisodios.bySeries(s.seriesid);
-    const c = document.createElement('div');
-    c.className = 'card';
-    c.style.background = s.bgColor || '#222';
-    c.innerHTML = `
-      <img src="${s.portada_serie}" alt="${s.titulo_serie}" loading="lazy">
-      <div class="ov">
-        <span class="badge">Serie · ${eps.length} ep.</span>
-        <div class="ttl">${s.titulo_serie}</div>
-        <div class="sub">${s.descripcion_serie}</div>
-      </div>`;
-    c.onclick = () => UniversalPlayer.play({ type:'series', seriesid: s.seriesid });
-    $series.appendChild(c);
-  });
+            // Agregar más series simuladas
+            const cardSerie2 = document.createElement('div');
+            cardSerie2.className = 'card';
+            cardSerie2.innerHTML = `
+                <img src="https://via.placeholder.com/300x169?text=Otra+Serie" alt="Otra serie">
+                <div class="card-info">
+                    <h3>Serie Ejemplo 2</h3>
+                    <p>Próximamente más contenido.</p>
+                    <button class="boton-play">▶ Próximamente</button>
+                </div>
+            `;
+            grid.appendChild(cardSerie2);
+        }
 
-  // Render episodios sin serie real (películas / individuales)
-  const seriesIds = new Set(window.SERIES.map(s => s.seriesid));
-  const singles = window.EPISODES.filter(e => !seriesIds.has(e.seriesid));
-  const $singles = document.getElementById('singles');
-  singles.forEach(e => {
-    const c = document.createElement('div');
-    c.className = 'card';
-    c.innerHTML = `
-      <img src="${e.thumbnail || e.thumbnail2}" alt="${e.title}" loading="lazy">
-      <div class="ov">
-        <span class="badge">${e.type || 'Video'} · ${e.year || ''}</span>
-        <div class="ttl">${e.title}</div>
-        <div class="sub">${e.description || ''}</div>
-      </div>`;
-    c.onclick = () => UniversalPlayer.play({ type:'episode', id: e.id });
-    $singles.appendChild(c);
-  });
+        function cargarSingles() {
+            const grid = document.getElementById('singles-grid');
+            const cardSingle = document.createElement('div');
+            cardSingle.className = 'card';
+            cardSingle.innerHTML = `
+                <img src="${peliculaSuelta.thumbnail}" alt="Película">
+                <div class="card-info">
+                    <h3>${peliculaSuelta.title}</h3>
+                    <p>${peliculaSuelta.description}</p>
+                    <button class="boton-play" data-single="amor-dios">▶ Reproducir</button>
+                </div>
+            `;
+            cardSingle.querySelector('button').addEventListener('click', () => {
+                window.playSingle(peliculaSuelta);
+            });
+            grid.appendChild(cardSingle);
+        }
 
-  function playRandom(){
-    const ep = window.masEpisodios.random(1)[0];
-    if (ep) UniversalPlayer.play({ type:'episode', episode: ep });
-  }
-</script>
+        cargarCatalogo();
+        cargarSingles();
+    </script>
 </body>
 </html>
