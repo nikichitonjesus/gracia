@@ -80,17 +80,15 @@
     <div class="catalogo">
         <h1>🎬 Contenido Destacado</h1>
         <div class="series-grid" id="catalogo-grid"></div>
-        
         <hr>
         <h2>📺 Episodios sueltos</h2>
         <div class="series-grid" id="singles-grid"></div>
     </div>
 
-    <!-- Cargar módulos -->
     <script src="memoria.js"></script>
     <script src="player.js"></script>
     <script>
-        // Datos de ejemplo
+        // Datos de ejemplo (usando los mismos enlaces de archive.org)
         const serieJesucristo = {
             seriesId: "jesucristo",
             titulo_serie: "La vida de Jesucristo",
@@ -143,7 +141,6 @@
 
         function cargarCatalogo() {
             const grid = document.getElementById('catalogo-grid');
-            // Serie
             const cardSerie = document.createElement('div');
             cardSerie.className = 'card';
             cardSerie.innerHTML = `
@@ -158,19 +155,6 @@
                 window.playSerie(serieJesucristo.seriesId, serieJesucristo.episodios);
             });
             grid.appendChild(cardSerie);
-
-            // Agregar más series simuladas
-            const cardSerie2 = document.createElement('div');
-            cardSerie2.className = 'card';
-            cardSerie2.innerHTML = `
-                <img src="https://via.placeholder.com/300x169?text=Otra+Serie" alt="Otra serie">
-                <div class="card-info">
-                    <h3>Serie Ejemplo 2</h3>
-                    <p>Próximamente más contenido.</p>
-                    <button class="boton-play">▶ Próximamente</button>
-                </div>
-            `;
-            grid.appendChild(cardSerie2);
         }
 
         function cargarSingles() {
