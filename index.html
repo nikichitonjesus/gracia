@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reproductor Universal — Demo</title>
+  <style>
+    :root { --bg:#0a0c10; --panel:#11141a; --text:#fff; --dim:rgba(255,255,255,.65); --accent:#00a8e1; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+    header { padding:24px 32px; border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex; align-items:center; gap:14px; }
+    header h1 { margin:0; font-size:22px; font-weight:700; letter-spacing:-.3px; }
+    header span { color:var(--dim); font-size:13px; }
+    main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+    h2 { font-size:18px; margin: 28px 0 14px; font-weight:600; letter-spacing:.2px;
+      display:flex; align-items:center; gap:10px; }
+    h2::before { content:''; width:4px; height:18px; background:var(--accent); border-radius:2px; }
+    .row { display:grid; gap:14px; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); }
+    .card { background:var(--panel); border-radius:10px; overflow:hidden;
+      cursor:pointer; transition:transform .25s ease, box-shadow .25s; border:1px solid rgba(255,255,255,.04); }
+    .card:hover { transform:translateY(-4px); box-shadow:0 12px 28px rgba(0,168,225,.18); }
+    .card .thumb { width:100%; aspect-ratio:16/9; background:#1a1d23 center/cover; }
+    .card .info { padding:10px 12px; }
+    .card .info h3 { margin:0 0 4px; font-size:14px; font-weight:600;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card .info p  { margin:0; font-size:12px; color:var(--dim);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .badge { display:inline-block; font-size:10px; padding:2px 8px; border-radius:999px;
+      background:rgba(0,168,225,.18); color:var(--accent); font-weight:700;
+      letter-spacing:.5px; text-transform:uppercase; margin-bottom:6px; }
+    .badge.movie { background:rgba(255,255,255,.1); color:#fff; }
+    .actions { display:flex; gap:8px; padding:0 12px 12px; }
+    .actions button { flex:1; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.1);
+      color:#fff; padding:6px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;
+      transition:all .2s; }
+    .actions button:hover { background:var(--accent); border-color:var(--accent); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📺 Reproductor Universal</h1>
+    <span>Demo — estilo Prime Video</span>
+  </header>
+
+  <main>
+    <h2>Series</h2>
+    <div class="row" id="seriesRow"></div>
+
+    <h2>Episodios</h2>
+    <div class="row" id="episodesRow"></div>
+
+    <h2>Películas</h2>
+    <div class="row" id="moviesRow"></div>
+  </main>
+
+  <!-- ===== DATOS DE EJEMPLO ===== -->
+  <script>
+    // Series (sin mediaUrl — son agrupadores)
+    const series = [
+      {
+        seriesid: 'jesucristo',
+        portada_serie: 'https://nikichitonjesus1.odoo.com/web/image/465-4e045826/Min-jesus.webp',
+        titulo_serie: 'Jesucristo Hombre',
+        descripcion_serie: 'La historia más grande jamás contada.',
+        url_serie: '/jesucristo-hombre',
+        bgColor: '#46210a'
+      }
+    ];
+
+    // Episodios (algunos pertenecen a la serie de arriba; otros son sueltos)
+    const episodios = [
+      {
+        id: 'jesucristo-cap1',
+        date: '2025-11-28',
+        mediaUrl: 'https://archive.org/download/la-vida-de-jesus-en-ixil-trailer/la%20vida%20de%20Jes%C3%BAs.mp4',
+        thumbnail: 'https://nikichitonjesus1.odoo.com/web/image/465-4e045826/Min-jesus.webp',
+        title: 'Jesucristo sobre la tierra — Capítulo 1',
+        description: 'Comienza el viaje del hijo del Hombre.',
+        seriesid: 'jesucristo',
+        skipIntro: { start: '00:00', end: '00:08' },
+        bgColor: '#46210a'
+      },
+      {
+        id: 'jesucristo-cap2',
+        date: '2025-12-05',
+        mediaUrl: 'https://archive.org/download/la-vida-de-jesus-en-espanol-trailer/la%20vida%20de%20Jes%C3%BAs.mp4',
+        thumbnail: 'https://video.nikichitonjesus.org/web/image/438-44d31586/6.webp',
+        title: 'Jesucristo sobre la tierra — Capítulo 2',
+        description: 'El maestro reúne a sus discípulos.',
+        seriesid: 'jesucristo',
+        bgColor: '#46210a'
+      }
+    ];
+
+    // Películas (sin seriesid)
+    const peliculas = [
+      {
+        id: 'big-buck-bunny',
+        date: '2008-05-30',
+        mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        thumbnail: 'https://peach.blender.org/wp-content/uploads/title_anouncement.jpg',
+        title: 'Big Buck Bunny',
+        description: 'Cortometraje de animación de Blender.'
+      },
+      {
+        id: 'sintel',
+        date: '2010-09-30',
+        mediaUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+        thumbnail: 'https://durian.blender.org/wp-content/uploads/2010/05/sintel_poster_red.jpg',
+        title: 'Sintel',
+        description: 'Aventura épica en busca de un dragón.'
+      }
+    ];
+
+    // pool universal: lo que el reproductor usa para "siguiente aleatorio" y recomendados
+    const POOL = [...episodios, ...peliculas];
+    const RECS = [...series, ...peliculas];   // mostraremos series + películas en floating
+  </script>
+
+  <!-- ===== Reproductor ===== -->
+  <script src="./memoria.js"></script>
+  <script src="./player.js"></script>
+
+  <script>
+    function card({ thumb, title, desc, badge, badgeClass, actions }) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `
+        <div class="thumb" style="background-image:url('${thumb || ''}')"></div>
+        <div class="info">
+          ${badge ? `<span class="badge ${badgeClass||''}">${badge}</span>` : ''}
+          <h3>${title}</h3><p>${desc || ''}</p>
+        </div>
+        <div class="actions">${actions}</div>`;
+      return div;
+    }
+
+    // SERIES
+    series.forEach(s => {
+      const c = card({
+        thumb: s.portada_serie, title: s.titulo_serie, desc: s.descripcion_serie,
+        badge: 'Serie', badgeClass: '',
+        actions: '<button data-act="series">▶ Reproducir serie</button>'
+      });
+      c.querySelector('[data-act="series"]').addEventListener('click', e => {
+        e.stopPropagation();
+        Player.playSeries(s, { episodes: POOL, recommendations: RECS });
+      });
+      document.getElementById('seriesRow').appendChild(c);
+    });
+
+    // EPISODIOS sueltos
+    episodios.forEach(ep => {
+      const c = card({
+        thumb: ep.thumbnail, title: ep.title, desc: ep.description,
+        badge: 'Episodio',
+        actions: '<button data-act="ep">▶ Solo este episodio</button>'
+      });
+      c.querySelector('[data-act="ep"]').addEventListener('click', e => {
+        e.stopPropagation();
+        Player.playEpisode(ep, { episodes: POOL, recommendations: RECS });
+      });
+      document.getElementById('episodesRow').appendChild(c);
+    });
+
+    // PELÍCULAS
+    peliculas.forEach(m => {
+      const c = card({
+        thumb: m.thumbnail, title: m.title, desc: m.description,
+        badge: 'Película', badgeClass: 'movie',
+        actions: '<button data-act="movie">▶ Reproducir</button>'
+      });
+      c.querySelector('[data-act="movie"]').addEventListener('click', e => {
+        e.stopPropagation();
+        Player.playMovie(m, { recommendations: RECS });
+      });
+      document.getElementById('moviesRow').appendChild(c);
+    });
+  </script>
+</body>
+</html>
